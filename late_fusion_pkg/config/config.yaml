@@ -1,0 +1,12 @@
+late_fusion_node:
+  ros__parameters:
+    image_input_topic: "/camera/image_raw"
+
+    YOLO_output_image_topic: "/late_fusion/yolo/image"
+    YOLO_human_detections_topic: "/late_fusion/yolo/human_detections"
+    YOLO_car_detections_topic: "/late_fusion/yolo/car_detections"
+
+    YOLO_model: "yolov5su.pt"
+    YOLO_threshold: 0.5
+    device: "cuda"
+
