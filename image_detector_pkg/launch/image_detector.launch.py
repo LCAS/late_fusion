@@ -4,18 +4,19 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from ament_index_python import get_package_share_directory
 
+
 def generate_launch_description():
     config_file = os.path.join(
-            get_package_share_directory("late_fusion_pkg"),
+            get_package_share_directory('image_detector_pkg'),
             'config',
             'config.yaml'
             )
 
-    return LaunchDescription([
+    return LaunchDescription(
             Node(
-                package='late_fusion_pkg',
-                executable='late_fusion_node',
-                name="late_fusion_node",
+                package='image_detector_pkg',
+                executable='image_detector_node',
+                name='image_detector_node',
                 parameters=[config_file]
                 )
-            ])
+            )
