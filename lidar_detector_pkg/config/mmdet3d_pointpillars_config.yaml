@@ -4,4 +4,4 @@ lidar_detector_node:
     weights_path: '/home/ros/ros2_ws/src/lidar_detector_pkg/model/hv_pointpillars_secfpn_6x8_160e_kitti-3d-3class_20220301_150306-37dc2420.pth'
     device: 'cuda:0'
     point_cloud_topic: '/lidar/points'
-    bounding_box_topic: '/lidar_detected_bounding_boxes'
+    bounding_box_topic: '/lidar_detector/detected_bounding_boxes'

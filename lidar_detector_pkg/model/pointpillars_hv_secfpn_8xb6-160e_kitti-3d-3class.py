@@ -119,6 +119,7 @@ param_scheduler = [
         end=epoch_num * 1,
         convert_to_iter_based=True)
 ]
+
 # max_norm=35 is slightly better than 10 for PointPillars in the earlier
 # development of the codebase thus we keep the setting. But we does not
 # specifically tune this parameter.
