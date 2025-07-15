@@ -6,7 +6,12 @@ package_name = 'lidar_detector_pkg'
 setup(
     name=package_name,
     version='0.0.1',
-    packages=find_packages(exclude=['test']),
+    packages=find_packages(
+        include=[
+            "lidar_detector_pkg",
+            "lidar_detector_pkg.*",
+            "scripts"],
+        exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
