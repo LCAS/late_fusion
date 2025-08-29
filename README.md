@@ -1,6 +1,6 @@
 # Late Fusion Package
 
-A ROS2 package for real-time late fusion of 2D and 3D object detections. This package implements the DeepFusion algorithm originally developed by [prabuddhi02](https://github.com/Prabuddhi-05/deepfusion).
+A ROS2 package for real-time late fusion of 2D and 3D object detections. This package implements the DeepFusion algorithm originally implemented in a ROS package by [prabuddhi02](https://github.com/Prabuddhi-05/deepfusion).
 
 ## Overview
 
