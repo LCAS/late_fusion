@@ -68,14 +68,92 @@ class LateFusionNode(Node):
 
         self.get_logger().info("DeepFussion node up and running...")
 
+    def _detections2d_to_2dbboxes(self, detections_2d):
+        '''args: detections_2d -> detection2darray
+        return: image_2dbboxes:(M,4) - 2D bounding boxes from camera in [x1, y1, x2, y2]'''
+        bboxes = []
+
+        for det in detections_2d.detections:
+            cx = det.bbox.center.x
+            cy = det.bbox.center.y
+            w = det.bbox.size_x
+            h = det.bbox.size_y
+
+            x1 = cx - w / 2.0
+            y1 = cy - h / 2.0
+            x2 = cx + w / 2.0
+            y2 = cy + h / 2.0
+
+            bboxes.append([x1, y1, x2, y2])
+
+        return np.array(bboxes, dtype=np.float32) if bboxes else np.zeros((0, 4), dtype=np.float32)
+
+    def _detections3d_to_2dbboxes(self, detections3d):
+        '''args: detections3d -> markerarraystamped(MarkerArray+Header)
+        return: lidar_2dbboxes:      (N,4) - 2D bounding boxes projected from 3D detection'''
+
+    def _detections3d_to_3dbboxes(self, detections3d):
+        '''args: detections3d -> markerarraystamped(MarkerArray+Header)
+        return: lidar_3dbboxes:  (N,7) - 3D bounding box in camera coords: [x,y,z,rot_y,l,w,h]'''
+
+        bboxes = []
+
+        for marker in detections3d.markers:
+            # Centro
+            x = marker.pose.position.x
+            y = marker.pose.position.y
+            z = marker.pose.position.z
+
+            # Dimensiones
+            l = marker.scale.x  # length
+            w = marker.scale.y  # width
+            h = marker.scale.z  # height
+
+            # Convertir quaternion a yaw (rot_y)
+            q = marker.pose.orientation
+            siny_cosp = 2.0 * (q.w * q.y + q.z * q.x)
+            cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.x * q.x)
+            rot_y = math.atan2(siny_cosp, cosy_cosp)
+
+            bboxes.append([x, y, z, rot_y, l, w, h])
+
+        return np.array(bboxes, dtype=np.float32) if bboxes else np.zeros((0, 7), dtype=np.float32)
+
+    def _get_meta_from_3ddetections(self, detections3d):
+        '''args: detections3d -> markerarraystamped(MarkerArray+Header)
+        return: (N,7) - e.g. orientation, detection scores, object type, etc.'''
+        meta = []
+
+        for marker in detections3d.markers:
+            # Orientación (cuaternión)
+            qx = marker.pose.orientation.x
+            qy = marker.pose.orientation.y
+            qz = marker.pose.orientation.z
+            qw = marker.pose.orientation.w
+
+            # Score (si no está definido, ponemos 1.0)
+            score = marker.color.a if marker.color.a > 0.0 else 1.0
+
+            # Tipo de objeto (namespace o texto -> convertimos a entero/hash)
+            if marker.text:
+                type_id = hash(marker.text) % (10**6)  # hash reducido
+            else:
+                type_id = hash(marker.ns) % (10**6) if marker.ns else -1
+
+            # Marker ID
+            marker_id = marker.id
+
+            meta.append([qx, qy, qz, qw, score, type_id, marker_id])
+
+        return np.array(meta, dtype=np.float32) if meta else np.zeros((0, 7), dtype=np.float32)
 
     def _main_pipeline(self, img_msg, image_detections, lidar_detections):
 
         cv2_img = self._imgmsg2np(img_msg)
 
-        image_2dbboxes = self._2ddetections_to_2dbboxes(image_detections) 
-        lidar_2dbboxes = self._3ddetections_to_2dbboxes(lidar_detections)
-        lidar_3dbboxes = self._3ddetections_to_3dbboxes(lidar_detections)
+        image_2dbboxes = self._detections2d_to_2dbboxes(image_detections) 
+        lidar_2dbboxes = self._detections3d_to_2dbboxes(lidar_detections)
+        lidar_3dbboxes = self._detections3d_to_3dbboxes(lidar_detections)
         meta_info_array = self._get_meta_from_3ddetections(lidar_detections)
 
         fused, unmatched_3d, unmatched_2d = self._fuse(
