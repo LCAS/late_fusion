@@ -13,6 +13,7 @@ from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithP
 
 from scripts.matching import linear_assignment
 from scripts.cost_function import iou_2d
+from scripts.proyector import Proyector
 
 
 class LateFusionNode(Node):
@@ -29,17 +30,17 @@ class LateFusionNode(Node):
         self.declare_parameter('image_input_topic', '/image_raw')
         image_input_topic = self.get_parameter('image_input_topic').value
 
-        self.declare_parameter('lidar_bbox_topic', '/detected_bonding_boxes')
-        lidar_bbox_topic = self.get_parameter('lidar_bbox_topic').value
+        self.declare_parameter('lidar_detections_topic', '/detected_bonding_boxes')
+        lidar_detections_topic = self.get_parameter('lidar_detections_topic').value
 
-        self.declare_parameter('image_bbox_topic', '/yolo_bounding_boxes')
-        image_bbox_topic = self.get_parameter('image_bbox_topic').value
+        self.declare_parameter('image_detections_topic', '/yolo_bounding_boxes')
+        image_detections_topic = self.get_parameter('image_detections_topic').value
 
         ts = TimeSynchronizer{
                 [
                     Subscriber(Image, image_input_topic),
-                    Subscriber(Detection2DArray, image_bbox_topic),
-                    Subscriber(MarkerArrayStamped, lidar_bbox_topic)
+                    Subscriber(Detection2DArray, image_detections_topic),
+                    Subscriber(MarkerArrayStamped, lidar_detections_topic)
                     ],
                 queue_size=10,
                 }
@@ -68,6 +69,24 @@ class LateFusionNode(Node):
 
         self.get_logger().info("DeepFussion node up and running...")
 
+    def _calib_callback(self, msg):
+
+        if not self.proyector:
+            for line in str(msg).split(r'\n'):
+                if line.startswith('std_msgs'):
+                    values = line.split("'")[1].split(':')[1].split()
+                    P = np.array([float(val) for val in values])
+                elif line.startswith('R_rect'):
+                    values = [val for val in line.split()]
+                    R0 = np.array([float(val) for val in values[1:]])
+                elif line.startswith('Tr_velo_cam'):
+                    values = [val for val in line.split()]
+                    V2C = np.array([float(val) for val in values[1:]])
+
+            P, R0, V2C = P.reshape(3, 4), R0.reshape(3, 3), V2C.reshape(3, 4)
+
+            self.proyector = Proyector(P, R0, V2C)
+
     def _detections2d_to_2dbboxes(self, detections_2d):
         '''args: detections_2d -> detection2darray
         return: image_2dbboxes:(M,4) - 2D bounding boxes from camera in [x1, y1, x2, y2]'''
@@ -88,9 +107,12 @@ class LateFusionNode(Node):
 
         return np.array(bboxes, dtype=np.float32) if bboxes else np.zeros((0, 4), dtype=np.float32)
 
-    def _detections3d_to_2dbboxes(self, detections3d):
+    def _detections3d_to_2dbboxes(self, detections3d, img):
         '''args: detections3d -> markerarraystamped(MarkerArray+Header)
         return: lidar_2dbboxes:      (N,4) - 2D bounding boxes projected from 3D detection'''
+        if self.proyector:
+            detections_2d = self.proyector(detections_3d, img)
+            return detections_2d
 
     def _detections3d_to_3dbboxes(self, detections3d):
         '''args: detections3d -> markerarraystamped(MarkerArray+Header)
@@ -152,7 +174,7 @@ class LateFusionNode(Node):
         cv2_img = self._imgmsg2np(img_msg)
 
         image_2dbboxes = self._detections2d_to_2dbboxes(image_detections) 
-        lidar_2dbboxes = self._detections3d_to_2dbboxes(lidar_detections)
+        lidar_2dbboxes = self._detections3d_to_2dbboxes(lidar_detections, cv2_img)
         lidar_3dbboxes = self._detections3d_to_3dbboxes(lidar_detections)
         meta_info_array = self._get_meta_from_3ddetections(lidar_detections)
 

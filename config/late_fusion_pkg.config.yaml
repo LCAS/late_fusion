@@ -1,10 +1,13 @@
 late_fusion_node:
   ros__parameters:
+    image_input_topic: "/camera/image_raw"
     image_detections_topic: "yolo/detections"
     lidar_detections_topic: "lidar/detections"
+    calibration_topic: "/camera/calibration"
 
-    matching_topic: "deepfusion/matching"
-    nonmatching_topic: "deepfusion/nonmatching"
+    fussed_publisher_topic: "deepfusion/matching"
+    unmatched_3d_publisher_topic: "deepfusion/nonmatching_3d"
+    unmatched_2d_publisher_topic: "deepfusion/nonmatching_2d"
 
 
 projection_node:
