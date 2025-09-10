@@ -1,3 +1,30 @@
 #!/bin/bash
 
-kj
+cd $HOME/ros2_ws
+
+echo "[1/3] Building package"
+# colcon build --packages-select lidar_detector_pkg 
+# colcon build --packages-select image_detector_pkg
+# colcon build --packages-select markerarraystamped
+colcon build --packages-select late_fusion_pkg
+if [  $? -eq 1 ]; then
+	echo "ERROR: Error building package. Please check"
+	exit
+else
+	echo "Build done"
+fi
+
+echo
+echo "[2/3] Sourcing ROS2 overlay"
+source install/setup.bash
+
+if [  $? -eq 1 ]; then
+	echo "ERROR: Error sourcing environment. Please check"
+	exit
+else
+	echo "Environment loaded"
+fi
+
+echo
+echo "[3/3] Launching package"
+ros2 launch late_fusion_pkg late_fusion_pkg.launch.py

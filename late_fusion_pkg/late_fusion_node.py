@@ -2,18 +2,21 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
-from visualization_msgs import Marker, MarkerArray
 from message_filters import TimeSynchronizer, Subscriber
+from sensor_msgs.msg import Image
+from std_msgs.msg import String
 
 from markerarraystamped.msg import MarkerArrayStamped
+from my_msgs.msg import Float32MultiArrayStamped 
 
 from cv_bridge import CvBridge
 
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose, BoundingBox2D
 
-from scripts.matching import linear_assignment
-from scripts.cost_function import iou_2d
+
 from scripts.proyector import Proyector
+from scripts.cost_function import iou_2d
+from scripts.matching import linear_assignment
 
 
 class LateFusionNode(Node):
@@ -36,14 +39,14 @@ class LateFusionNode(Node):
         self.declare_parameter('image_detections_topic', '/yolo_bounding_boxes')
         image_detections_topic = self.get_parameter('image_detections_topic').value
 
-        ts = TimeSynchronizer{
+        ts = TimeSynchronizer(
                 [
-                    Subscriber(Image, image_input_topic),
-                    Subscriber(Detection2DArray, image_detections_topic),
-                    Subscriber(MarkerArrayStamped, lidar_detections_topic)
+                    Subscriber(self, Image, image_input_topic),
+                    Subscriber(self, Detection2DArray, image_detections_topic),
+                    Subscriber(self, MarkerArrayStamped, lidar_detections_topic)
                     ],
                 queue_size=10,
-                }
+                )
 
         ts.registerCallback(self._main_pipeline)
 
