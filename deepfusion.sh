@@ -3,10 +3,8 @@
 cd $HOME/ros2_ws
 
 echo "[1/3] Building package"
-# colcon build --packages-select lidar_detector_pkg 
-# colcon build --packages-select image_detector_pkg
-# colcon build --packages-select markerarraystamped
 colcon build --packages-select late_fusion_pkg
+
 if [  $? -eq 1 ]; then
 	echo "ERROR: Error building package. Please check"
 	exit

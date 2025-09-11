@@ -1,22 +1,22 @@
+import math
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 from message_filters import TimeSynchronizer, Subscriber
-from sensor_msgs.msg import Image
 from std_msgs.msg import String
+from visualization_msgs.msg import MarkerArray, Marker
+from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose, BoundingBox2D
 
 from markerarraystamped.msg import MarkerArrayStamped
 from my_msgs.msg import Float32MultiArrayStamped 
 
-from cv_bridge import CvBridge
-
-from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose, BoundingBox2D
-
-
 from scripts.proyector import Proyector
 from scripts.cost_function import iou_2d
 from scripts.matching import linear_assignment
+
+import numpy as np
 
 
 class LateFusionNode(Node):
@@ -24,14 +24,11 @@ class LateFusionNode(Node):
     def __init__(self):
         super().__init__("late_fusion_node")
 
-        self.bridge = CvBridge()
+        self.proyector = None
 
         qos_profile = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, depth=1)
 
         # DECLARE SUBSCRIPTIONS
-
-        self.declare_parameter('image_input_topic', '/image_raw')
-        image_input_topic = self.get_parameter('image_input_topic').value
 
         self.declare_parameter('lidar_detections_topic', '/detected_bonding_boxes')
         lidar_detections_topic = self.get_parameter('lidar_detections_topic').value
@@ -41,7 +38,6 @@ class LateFusionNode(Node):
 
         ts = TimeSynchronizer(
                 [
-                    Subscriber(self, Image, image_input_topic),
                     Subscriber(self, Detection2DArray, image_detections_topic),
                     Subscriber(self, MarkerArrayStamped, lidar_detections_topic)
                     ],
@@ -70,6 +66,13 @@ class LateFusionNode(Node):
         self.unmatched_3d_publisher = self.create_publisher(Float32MultiArrayStamped, unmatched_3d_publisher_topic, 10)
         self.unmatched_2d_publisher = self.create_publisher(Float32MultiArrayStamped, unmatched_2d_publisher_topic, 10)
 
+        # OBTAIN ANOTHER DATA
+        self.declare_parameter('image_width', 1242)
+        self.image_width = self.get_parameter('image_width').value
+
+        self.declare_parameter('image_height', 375)
+        self.image_height = self.get_parameter('image_height').value
+
         self.get_logger().info("DeepFussion node up and running...")
 
     def _calib_callback(self, msg):
@@ -88,7 +91,8 @@ class LateFusionNode(Node):
 
             P, R0, V2C = P.reshape(3, 4), R0.reshape(3, 3), V2C.reshape(3, 4)
 
-            self.proyector = Proyector(P, R0, V2C)
+            self.proyector = Proyector(P, R0, V2C, self.image_width, self.image_height)
+            self.get_logger().info("Transformation matrix built")
 
     def _detections2d_to_2dbboxes(self, detections_2d):
         '''args: detections_2d -> detection2darray
@@ -96,8 +100,8 @@ class LateFusionNode(Node):
         bboxes = []
 
         for det in detections_2d.detections:
-            cx = det.bbox.center.x
-            cy = det.bbox.center.y
+            cx = det.bbox.center.position.x
+            cy = det.bbox.center.position.y
             w = det.bbox.size_x
             h = det.bbox.size_y
 
@@ -108,49 +112,66 @@ class LateFusionNode(Node):
 
             bboxes.append([x1, y1, x2, y2])
 
-        return np.array(bboxes, dtype=np.float32) if bboxes else np.zeros((0, 4), dtype=np.float32)
+        return np.array(bboxes, dtype=np.float32) 
 
-    def _detections3d_to_2dbboxes(self, detections3d, img):
+    def _detections3d_to_2dbboxes(self, detections_3d):
         '''args: detections3d -> markerarraystamped(MarkerArray+Header)
         return: lidar_2dbboxes:      (N,4) - 2D bounding boxes projected from 3D detection'''
-        if self.proyector:
-            detections_2d = self.proyector(detections_3d, img)
-            return detections_2d
+        detections_2d = self.proyector.proyect(detections_3d)
+        return detections_2d
 
-    def _detections3d_to_3dbboxes(self, detections3d):
-        '''args: detections3d -> markerarraystamped(MarkerArray+Header)
-        return: lidar_3dbboxes:  (N,7) - 3D bounding box in camera coords: [x,y,z,rot_y,l,w,h]'''
+    def _detections3d_to_3dbboxes(self, marker_array):
+        """
+        Convert MarkerArray with CUBE markers to 3D bounding box params.
 
+        Args:
+            marker_array (visualization_msgs.msg.MarkerArray): Input marker array
+
+        Returns:
+            numpy.ndarray: Array of shape [n, 7] where each row is:
+                           [x, y, z, rot_y, l, w, h]
+        """
+
+        markers = marker_array.markers
         bboxes = []
 
-        for marker in detections3d.markers:
-            # Centro
-            x = marker.pose.position.x
-            y = marker.pose.position.y
-            z = marker.pose.position.z
+        for i, marker in enumerate(markers.markers):
 
-            # Dimensiones
-            l = marker.scale.x  # length
-            w = marker.scale.y  # width
-            h = marker.scale.z  # height
+            # Extract pose information
+            pos_x = marker.pose.position.x
+            pos_y = marker.pose.position.y
+            pos_z = marker.pose.position.z
 
-            # Convertir quaternion a yaw (rot_y)
-            q = marker.pose.orientation
-            siny_cosp = 2.0 * (q.w * q.y + q.z * q.x)
-            cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.x * q.x)
+            # Extract quaternion orientation
+            qx = marker.pose.orientation.x
+            qy = marker.pose.orientation.y
+            qz = marker.pose.orientation.z
+            qw = marker.pose.orientation.w
+
+            # Extract scale (dimensions)
+            length = marker.scale.x  # x-direction (forward)
+            width  = marker.scale.y  # y-direction (left)
+            height = marker.scale.z  # z-direction (up)
+
+            # Quaternion → yaw (rot_y)
+            siny_cosp = 2.0 * (qw * qz + qx * qy)
+            cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
             rot_y = math.atan2(siny_cosp, cosy_cosp)
 
-            bboxes.append([x, y, z, rot_y, l, w, h])
+            # Append bbox in format [x, y, z, rot_y, l, w, h]
+            bboxes.append([pos_x, pos_y, pos_z, rot_y, length, width, height])
 
-        return np.array(bboxes, dtype=np.float32) if bboxes else np.zeros((0, 7), dtype=np.float32)
+        return np.array(bboxes, dtype=np.float32)
 
     def _get_meta_from_3ddetections(self, detections3d):
         '''args: detections3d -> markerarraystamped(MarkerArray+Header)
         return: (N,7) - e.g. orientation, detection scores, object type, etc.'''
-        meta = []
 
-        for marker in detections3d.markers:
-            # Orientación (cuaternión)
+        meta = []
+        marker_array = detections3d.markers
+        
+        for i, marker in enumerate(marker_array.markers):
+
             qx = marker.pose.orientation.x
             qy = marker.pose.orientation.y
             qz = marker.pose.orientation.z
@@ -170,17 +191,35 @@ class LateFusionNode(Node):
 
             meta.append([qx, qy, qz, qw, score, type_id, marker_id])
 
-        return np.array(meta, dtype=np.float32) if meta else np.zeros((0, 7), dtype=np.float32)
+        return np.array(meta, dtype=np.float32)
 
-    def _main_pipeline(self, img_msg, image_detections, lidar_detections):
+    def _main_pipeline(self, image_detections, lidar_detections):
 
-        cv2_img = self._imgmsg2np(img_msg)
+        if not self.proyector:
+            return
 
+        self.get_logger().info("All data received")
+
+        # Message integrity verification
+        
+        if not image_detections.detections:
+            return
+
+        if not lidar_detections.markers:
+            return
+
+        # Preprocessing
         image_2dbboxes = self._detections2d_to_2dbboxes(image_detections) 
-        lidar_2dbboxes = self._detections3d_to_2dbboxes(lidar_detections, cv2_img)
+        lidar_2dbboxes = self._detections3d_to_2dbboxes(lidar_detections)
         lidar_3dbboxes = self._detections3d_to_3dbboxes(lidar_detections)
         meta_info_array = self._get_meta_from_3ddetections(lidar_detections)
 
+        if lidar_2dbboxes.shape[0] == 0:
+            return
+
+        self.get_logger().info("All data correct")
+
+        # Processing
         fused, unmatched_3d, unmatched_2d = self._fuse(
                 image_2dbboxes, 
                 lidar_2dbboxes, 
@@ -188,9 +227,9 @@ class LateFusionNode(Node):
                 meta_info_array
                 )
 
+        # Publishing
         now = self.get_clock().now().to_msg()
-
-        self.publish_array(self.fused_publisher, fused, now, key="dets_3d_fusion")
+        self.publish_array(self.fussed_publisher, fused, now, key="dets_3d_fusion")
         self.publish_array(self.unmatched_3d_publisher, unmatched_3d, now, key="dets_3d_only")
         self.publish_array(self.unmatched_2d_publisher, unmatched_2d, now)
 
@@ -210,14 +249,6 @@ class LateFusionNode(Node):
         msg.data = [float(x) for row in values for x in row]
 
         publisher.publish(msg)
-
-
-    def _imgmsg2np(self, img_msg):
-        try:
-            return self.bridge.imgmsg_to_cv2(image_msg, desired_encoding='bgr8')
-        except Exception:
-            self.get_logger().warning("Empty image message received")
-            return None
 
     def _fuse(self, image_2dbboxes, lidar_2dbboxes, lidar_3dbboxes, meta_info_array):
         """
