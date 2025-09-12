@@ -31,6 +31,7 @@ The package provides two ROS2 nodes:
 ### Option 1: Automated Installation (Experimental)
 
 ⚠️ **Warning**: This automated installation is experimental and may not work in all environments.
+
 **Not implemented yet**
 
 ```bash
@@ -60,7 +61,7 @@ bash install.sh
 Please follow the installation instructions for each detector package.
 
 4. Install the related messages trought the following package:
-    -**Custom messages**: [custom_msgs](https://github.com/ernstmv/custom_msgs)
+   - **Custom messages**: [custom_msgs](https://github.com/ernstmv/custom_msgs)
 
 ## Configuration
 
