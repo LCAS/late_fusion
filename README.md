@@ -1,6 +1,6 @@
 # Late Fusion Package
 
-A ROS2 package for real-time late fusion of 2D and 3D object detections. This package implements the DeepFusion algorithm originally implemented in a ROS package by [prabuddhi02](https://github.com/Prabuddhi-05/deepfusion).
+A ROS2 package for real-time late fusion of 2D and 3D object detections. This package implements the DeepFusion algorithm originally implemented in a ROS2 package by [prabuddhi02](https://github.com/Prabuddhi-05/deepfusion).
 
 ## Overview
 
@@ -31,6 +31,7 @@ The package provides two ROS2 nodes:
 ### Option 1: Automated Installation (Experimental)
 
 ⚠️ **Warning**: This automated installation is experimental and may not work in all environments.
+**Not implemented yet**
 
 ```bash
 cd ros2_ws/src
@@ -44,31 +45,39 @@ bash install_all.sh
 1. Clone this repository:
 ```bash
 cd ros2_ws/src
-git clone git@github.com:LCAS/late_fusion.git
-cd late_fusion
+git clone git@github.com:LCAS/late_fusion.git late_fusion_pkg
+cd late_fusion_pkg
 ```
 
 2. Install dependencies:
 ```bash
-bash install_all.sh
+bash install.sh
 ```
 
 3. Install the required detector packages:
    - **Image Detector**: [image_detector_pkg](https://github.com/ernstmv/image_detector_pkg)
-   - **LiDAR Detector**: [3d_lidar_detector](https://github.com/ernstmv/lidar_detector_pkg/settings) 
+   - **LiDAR Detector**: [3d_lidar_detector](https://github.com/ernstmv/lidar_detector_pkg) 
 Please follow the installation instructions for each detector package.
+
+4. Install the related messages trought the following package:
+    -**Custom messages**: [custom_msgs](https://github.com/ernstmv/custom_msgs)
 
 ## Configuration
 
-The package can be configured through the `config/late_fusion_config.yaml` file:
+The package can be configured through the `config/late_fusion_pkg.config.yaml` file:
 
 ```yaml
 late_fusion_node:
   ros__parameters:
-    image_detections_topic: "yolo/detections"
-    lidar_detections_topic: "lidar/detections"
-    matching_topic: "deepfusion/matching"
-    nonmatching_topic: "deepfusion/nonmatching"
+    calibration_topic: "/camera/calibration"
+    image_detections_topic: "/yolo/detections"
+    lidar_detections_topic: "/lidar/detections"
+    image_width: 1242
+    image_height: 375
+
+    fussed_publisher_topic: "/late_fusion/matching"
+    unmatched_3d_publisher_topic: "/late_fusion/nonmatching_3d"
+    unmatched_2d_publisher_topic: "/late_fusion/nonmatching_2d"
 
 projection_node:
   ros__parameters:
@@ -95,14 +104,15 @@ ros2 launch late_fusion_pkg late_fusion.launch.py
 
 ### Subscribed Topics
 
-- `yolo/detections` - 2D image detections
-- `lidar/detections` - 3D LiDAR detections
-- `camera/image_raw` - Raw camera images (for projection node)
+- `/yolo/detections` - 2D image detections (vision_msgs/msg/Detection2DArray)
+- `/lidar/detections` - 3D LiDAR detections (custom_mgs/msg/MarkerArrayStamped)
+- `/camera/calibration` - Raw camera images (std_msgs/msg/String)
 
 ### Published Topics
 
-- `deepfusion/matching` - Fused detections with matches between sensors
-- `deepfusion/nonmatching` - Detections that couldn't be matched between sensors
+- `/late_fusion/matching` - Fused detections with matches between sensors (my_msgs/msg/Float32MultiArrayStamped)
+- `/late_fusion/nonmatching_3d` - Detections that couldn't be matched between sensors (custom_mgs/msg/MarkerArrayStamped)
+- `/late_fusion/nonmatching_2d` - Detections that couldn't be matched between sensors (vision_msgs/msg/Detection2DArray)
 
 ## Performance Considerations
 
@@ -113,10 +123,6 @@ ros2 launch late_fusion_pkg late_fusion.launch.py
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
-
-## License
-
-[Add your license information here]
 
 ## Acknowledgments
 
