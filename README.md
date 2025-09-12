@@ -55,8 +55,7 @@ bash install_all.sh
 
 3. Install the required detector packages:
    - **Image Detector**: [image_detector_pkg](https://github.com/ernstmv/image_detector_pkg)
-   - **LiDAR Detector**: [3d_lidar_detector](https://github.com/ernstmv/3d_lidar_detector)
-
+   - **LiDAR Detector**: [3d_lidar_detector](https://github.com/ernstmv/lidar_detector_pkg/settings) 
 Please follow the installation instructions for each detector package.
 
 ## Configuration
