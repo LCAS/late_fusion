@@ -12,9 +12,9 @@ from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithP
 from markerarraystamped.msg import MarkerArrayStamped
 from my_msgs.msg import Float32MultiArrayStamped 
 
-from scripts.proyector import Proyector
-from scripts.cost_function import iou_2d
-from scripts.matching import linear_assignment
+from late_fusion_scripts.proyector import Proyector
+from late_fusion_scripts.cost_function import iou_2d
+from late_fusion_scripts.matching import linear_assignment
 
 import numpy as np
 
