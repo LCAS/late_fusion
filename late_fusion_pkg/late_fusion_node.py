@@ -9,8 +9,7 @@ from std_msgs.msg import String
 from visualization_msgs.msg import MarkerArray, Marker
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose, BoundingBox2D
 
-from markerarraystamped.msg import MarkerArrayStamped
-from my_msgs.msg import Float32MultiArrayStamped 
+from custom_msgs.msg import MarkerArrayStamped, Float32MultiArrayStamped
 
 from late_fusion_scripts.proyector import Proyector
 from late_fusion_scripts.cost_function import iou_2d
