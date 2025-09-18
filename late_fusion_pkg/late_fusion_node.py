@@ -73,6 +73,9 @@ class LateFusionNode(Node):
         self.declare_parameter('image_height', 375)
         self.image_height = self.get_parameter('image_height').value
 
+        self.declare_parameter('iou_threshold', 0.1)
+        self.iou_threshold = self.get_parameter('iou_threshold').value
+
         self.get_logger().info("DeepFussion node up and running...")
 
     def _calib_callback(self, msg):
@@ -261,7 +264,6 @@ class LateFusionNode(Node):
             detection_3D_only:   { 'dets_3d_only': [...], 'dets_3d_only_info': [...] }
             image_2dbboxes_only:   [ [...], [...], ... ]
         """
-        iou_threshold = 0.3
         if len(image_2dbboxes) == 0 or len(lidar_2dbboxes) == 0:
             # If no 2D or no 3Dto2D, then either everything is unmatched or...
             detection_3D_fusion = {'dets_3d_fusion': [], 'dets_3d_fusion_info': []}
@@ -280,7 +282,7 @@ class LateFusionNode(Node):
 
         # Hungarian / linear assignment
         if min(iou_matrix.shape) > 0:
-            a = (iou_matrix > iou_threshold).astype(np.int32)
+            a = (iou_matrix > self.iou_threshold).astype(np.int32)
             if a.sum(1).max() == 1 and a.sum(0).max() == 1:
                 matched_indices = np.stack(np.where(a), axis=1)
             else:
@@ -300,7 +302,7 @@ class LateFusionNode(Node):
                 unmatched_3dto2d.append(t)
         # filter out any low iou matches
         for m in matched_indices:
-            if iou_matrix[m[0], m[1]] < iou_threshold:
+            if iou_matrix[m[0], m[1]] < self.iou_threshold:
                 unmatched_2d.append(m[0])
                 unmatched_3dto2d.append(m[1])
             else:

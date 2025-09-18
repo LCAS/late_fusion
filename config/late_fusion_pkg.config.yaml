@@ -3,8 +3,10 @@ late_fusion_node:
     calibration_topic: "/camera/calibration"
     image_detections_topic: "/yolo/detections"
     lidar_detections_topic: "/lidar/detections"
+
     image_with: 1242
     image_height: 375
+    iou_threshold: 0.1
 
     fussed_publisher_topic: "/late_fusion/matching"
     unmatched_3d_publisher_topic: "/late_fusion/nonmatching_3d"
